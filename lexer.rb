@@ -43,6 +43,62 @@ class Lexer
         @remain << remain_last unless remain_last.nil?
         yield @token, @match
         break
+      when /^camera/
+        @token = :camera
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^location/
+        @token = :location
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^right/
+        @token = :right
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^up/
+        @token = :up
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^angle/
+        @token = :angle
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^look_at/
+        @token = :look_at
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^rotate/
+        @token = :rotate
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^translate/
+        @token = :translate
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
       when /^\{/
         @token = :lbrace
         @match = $&
