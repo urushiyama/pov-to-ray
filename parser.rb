@@ -11,6 +11,7 @@ class Parser
   end
 
   def start
+    @parsed << "SBT-raytracer 1.0\n"
     while @token!=:EOD
       STDERR.print '.'
       case @token
