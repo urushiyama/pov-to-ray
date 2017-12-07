@@ -1,8 +1,6 @@
 class Lexer
-  MAX_CHECK_LENGTH = 16
-
   def initialize(text)
-    @remain = text.gsub(/(\r\n|\r|\n)/, ' ')
+    @remain = text.gsub(/(\r\n|\r|\n)/, " \n")
     @match = ""
     @token = nil
   end
@@ -15,8 +13,14 @@ class Lexer
         yield @token, @match
         break
       end
-      remain_top = @remain[0, MAX_CHECK_LENGTH]
-      remain_last = @remain[MAX_CHECK_LENGTH, @remain.length]
+      index = @remain.index("\n")
+      if index.nil?
+        remain_top = @remain
+        remain_last = nil
+      else
+        remain_top = @remain[0, index+1]
+        remain_last = @remain[index+1, @remain.length]
+      end
       case remain_top
       when /^mesh2/
         @token = :mesh
@@ -83,6 +87,13 @@ class Lexer
         break
       when /^-?[0-9]+/
         @token = :int
+        @match = $&
+        @remain = $'
+        @remain << remain_last unless remain_last.nil?
+        yield @token, @match
+        break
+      when /^\/\/[^\n]*/
+        @token = :comment
         @match = $&
         @remain = $'
         @remain << remain_last unless remain_last.nil?
