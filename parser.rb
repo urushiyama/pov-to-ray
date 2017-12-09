@@ -43,14 +43,14 @@ class Parser
   end
 
   def mesh
-    assert(:mesh) {@parsed << "rotate(1, 0, 0, 4.71238898,\n" << "trimesh"}
+    assert(:mesh) {@parsed << "trimesh"}
     assert(:lbrace) {@parsed << "{\n"}
     # set material template
     @parsed << "material = {\n"
     @parsed << "diffuse = (0.8, 0.8, 0.8);\n"
     @parsed << "}\n"
     defines()
-    assert(:rbrace) {@parsed << "}\n" << ");\n" }
+    assert(:rbrace) {@parsed << "}\n"}
   end
 
   def defines
@@ -98,13 +98,14 @@ class Parser
   end
 
   def vertex()
-    assert(:langle) {@parsed << "("}
-    assert(:real) {@parsed << @match}
-    while @token==:comma
-      assert(:comma) {@parsed << ","}
-      assert(:real) {@parsed << @match}
-    end
-    assert(:rangle) {@parsed << ")"}
+    vertex = [0,0,0]
+    assert(:langle)
+    assert(:int, :real) {vertex[0] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {vertex[2] = -@match.to_f}
+    assert(:comma)
+    assert(:int, :real) {vertex[1] = @match.to_f}
+    assert(:rangle) {@parsed << "(#{vertex.join(',')})"}
   end
 
   def faces()
