@@ -11,6 +11,8 @@ class Parser
     @rotate = [0.0, 0.0, 0.0]
     @up = 1
     @right = 1
+    @look_at = [0,0,-1]
+    @fov = 50
     @dict = Dictionary.new
   end
 
@@ -286,7 +288,7 @@ class Parser
       [1, 0, 0],
       [0, Math.cos(rot[0]), -Math.sin(rot[0])],
       [0, Math.sin(rot[0]), Math.cos(rot[0])]
-    ] * Vector[0, 0, 1]
+    ] * Vector[*@look_at]
     @parsed << "viewdir = (#{viewdir_vector.to_a.join(',')});\n"
     # updir_vector = Vector[0, 0, 1]
     updir_vector = Matrix[
@@ -304,6 +306,7 @@ class Parser
     ] * Vector[0, 1, 0]
     @parsed << "updir = (#{updir_vector.to_a.join(',')});\n"
     @parsed << "aspectratio = #{@right / @up};\n"
+    @parsed << "fov = #{@fov / @right * @up};\n"
   end
 
   def camera_param()
@@ -337,7 +340,7 @@ class Parser
       assert(:rangle)
     when :angle
       assert(:angle)
-      assert(:real, :int) {@parsed << "fov = #{@match.to_f};\n"} # fov
+      assert(:real, :int) {@fov = @match.to_f} # fov
     when :rotate
       assert(:rotate)
       assert(:langle)
@@ -357,15 +360,14 @@ class Parser
       assert(:real, :int) {@pos[1] = @pos[1].to_f - @match.to_f} # Y pos translate
       assert(:rangle)
     when :look_at
-      look_at = [0, 0, 0]
       assert(:look_at)
       assert(:langle)
-      assert(:real, :int) {look_at[0] = @match.to_f} # X look_at
+      assert(:real, :int) {@look_at[0] = @match.to_f} # X look_at
       assert(:comma)
-      assert(:real, :int) {look_at[2] = -@match.to_f} # -Z look_at
+      assert(:real, :int) {@look_at[1] = @match.to_f} # Y look_at
       assert(:comma)
-      assert(:real, :int) {look_at[1] = @match.to_f} # Y look_at
-      assert(:rangle) {@parsed << "look_at = (#{look_at.join(',')});\n"}
+      assert(:real, :int) {@look_at[2] = @match.to_f} # Z look_at
+      assert(:rangle) # {@parsed << "look_at = (#{look_at.join(',')});\n"}
     when :identifier
       # direction, sky, apertureなどのフォーカル・ブラーは未実装
       assert(:identifier)
