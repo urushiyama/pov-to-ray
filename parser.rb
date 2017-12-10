@@ -272,7 +272,7 @@ class Parser
     while @token==:location || @token==:right || @token==:up || @token==:angle || @token==:rotate || @token==:translate ||@token==:look_at || @token==:identifier
       camera_param()
     end
-    @parsed << "position = (#{@pos[0]},#{@pos[1]},#{@pos[1]});\n"
+    @parsed << "position = (#{@pos[0]},#{@pos[1]},#{@pos[2]});\n"
     rot = @rotate.map{|v| v * Math::PI / 180} # degree to radian
     viewdir_vector = Matrix[
       [Math.cos(rot[2]), -Math.sin(rot[2]), 0],
@@ -288,7 +288,20 @@ class Parser
       [0, Math.sin(rot[0]), Math.cos(rot[0])]
     ] * Vector[0, 0, 1]
     @parsed << "viewdir = (#{viewdir_vector.to_a.join(',')});\n"
-    updir_vector = Vector[0, 0, 1]
+    # updir_vector = Vector[0, 0, 1]
+    updir_vector = Matrix[
+      [Math.cos(rot[2]), -Math.sin(rot[2]), 0],
+      [Math.sin(rot[2]), Math.cos(rot[2]), 0],
+      [0, 0, 1]
+    ] * Matrix[
+      [Math.cos(rot[1]), 0, Math.sin(rot[1])],
+      [0, 1, 0],
+      [-Math.sin(rot[1]), 0, Math.cos(rot[1])]
+    ] * Matrix[
+      [1, 0, 0],
+      [0, Math.cos(rot[0]), -Math.sin(rot[0])],
+      [0, Math.sin(rot[0]), Math.cos(rot[0])]
+    ] * Vector[0, 1, 0]
     @parsed << "updir = (#{updir_vector.to_a.join(',')});\n"
     @parsed << "aspectratio = #{@right / @up};\n"
   end
@@ -300,9 +313,9 @@ class Parser
       assert(:langle)
       assert(:real, :int) {@pos[0] = @match.to_f} # X
       assert(:comma)
-      assert(:real, :int) {@pos[2] = -@match.to_f} # -Z
+      assert(:real, :int) {@pos[2] = @match.to_f} # -Z
       assert(:comma)
-      assert(:real, :int) {@pos[1] = @match.to_f} # Y
+      assert(:real, :int) {@pos[1] = -@match.to_f} # Y
       assert(:rangle)
     when :right
       assert(:right)
@@ -328,9 +341,9 @@ class Parser
     when :rotate
       assert(:rotate)
       assert(:langle)
-      assert(:real, :int) {@rotate[0] = @match.to_f} # X rotate degree
+      assert(:real, :int) {@rotate[0] = -@match.to_f} # X rotate degree
       assert(:comma)
-      assert(:real, :int) {@rotate[2] = -@match.to_f} # -Z rotate degree
+      assert(:real, :int) {@rotate[2] = @match.to_f} # -Z rotate degree
       assert(:comma)
       assert(:real, :int) {@rotate[1] = @match.to_f} # Y rotate degree
       assert(:rangle)
@@ -339,9 +352,9 @@ class Parser
       assert(:langle)
       assert(:real, :int) {@pos[0] = @pos[0].to_f + @match.to_f} # X pos translate
       assert(:comma)
-      assert(:real, :int) {@pos[2] = @pos[2].to_f - @match.to_f} # -Z pos translate
+      assert(:real, :int) {@pos[2] = @pos[2].to_f + @match.to_f} # -Z pos translate
       assert(:comma)
-      assert(:real, :int) {@pos[1] = @pos[1].to_f + @match.to_f} # Y pos translate
+      assert(:real, :int) {@pos[1] = @pos[1].to_f - @match.to_f} # Y pos translate
       assert(:rangle)
     when :look_at
       look_at = [0, 0, 0]
