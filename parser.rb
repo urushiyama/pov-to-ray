@@ -1,5 +1,7 @@
 require 'matrix'
 require './assert_helper.rb'
+require './dictionary.rb'
+require './mesh_data.rb'
 
 class Parser
   def initialize(lexer)
@@ -9,6 +11,7 @@ class Parser
     @rotate = [0.0, 0.0, 0.0]
     @up = 1
     @right = 1
+    @dict = Dictionary.new
   end
 
   def parse
@@ -26,7 +29,11 @@ class Parser
     @parsed << "SBT-raytracer 1.0\n"
     # set directional light template
     @parsed << "directional_light {\n"
-    @parsed << "direction=( -0.764302,-0.392387,0.511737 );\n"
+    @parsed << "direction=( -0.764302,-0.392387,-0.511737 );\n"
+    @parsed << "color=( 1,1,1 );\n"
+    @parsed << "}\n"
+    @parsed << "directional_light {\n"
+    @parsed << "direction=( 0.392387,0.764302,-0.511737 );\n"
     @parsed << "color=( 1,1,1 );\n"
     @parsed << "}\n"
     while @token!=:EOD
@@ -38,6 +45,8 @@ class Parser
       #   mesh()
       when :camera
         camera()
+      when :object
+        object()
       else
         parse_next()
       end
@@ -45,21 +54,38 @@ class Parser
   end
 
   def declare
+    identifier = ""
+    id_line = 0
     assert(:declare)
-    assert(:identifier)
+    assert(:identifier) do
+      identifier = @match
+      id_line = @line_number
+    end
     assert(:equal)
     case @token
     when :int
-      assert(:int)
+      assert(:int) do
+        unless @dict.write(identifier, :int, @match.to_i)
+          STDERR.puts "Parse Error: #{identifier} in line #{id_line} is duplicated\n"
+        end
+      end
       assert(:semicolon)
     when :real
-      assert(:real)
+      assert(:real) do
+        unless @dict.write(identifier, :real, @match.to_f)
+          STDERR.puts "Parse Error: #{identifier} in line #{id_line} is duplicated\n"
+        end
+      end
       assert(:semicolon)
     when :langle
       vector()
       assert(:semicolon)
     when :mesh
-      mesh()
+      mesh() do |data|
+        unless @dict.write(identifier, :mesh, data)
+          STDERR.puts "Parse Error: #{identifier} in line #{id_line} is duplicated\n"
+        end
+      end
     when :identifier
       assert(:identifier)
     else
@@ -67,21 +93,95 @@ class Parser
     end
   end
 
+  def object
+    assert(:object)
+    assert(:lbrace)
+    object_defines() do |mesh|
+      @parsed << mesh.apply_matrix.parse unless mesh.nil?
+    end
+    assert(:rbrace)
+  end
+
+  def object_defines
+    mesh = nil
+    mesh_matrix = nil
+    while @token==:identifier || @token==:matrix
+      case @token
+      when :identifier
+        assert(:identifier) do
+          data = @dict.read(@match)
+          if data.nil? || data[:type].nil? || data[:type]!=:mesh
+            # unsupported identifier or undeclared identifier
+            while @token!=:identifier && @token!=:matrix && @token!=:rbrace
+              parse_next()
+              if @token==:EOD
+                STDERR.puts "Parse Error: reached end of line before expected #{[:identifier, :matrix, :rbrace].join(' or ')} is appeared\n"
+                break
+              end
+            end
+          else
+            mesh = data[:data]
+          end
+        end
+      when :matrix
+        matrix = [[0,0,0,0], [0,0,0,0], [0,0,0,0]]
+        assert(:matrix)
+        assert(:langle)
+        assert(:int, :real) {matrix[0][0] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[1][0] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[2][0] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[0][1] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[1][1] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[2][1] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[0][2] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[1][2] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[2][2] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[0][3] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[1][3] = @match.to_f}
+        assert(:comma)
+        assert(:int, :real) {matrix[2][3] = @match.to_f}
+        assert(:rangle) {mesh_matrix = Matrix[*matrix]}
+      else
+        assert(:identifier, :matrix)
+      end
+    end
+    mesh.matrix = mesh_matrix unless mesh.nil?
+    yield mesh
+  end
+
   def mesh
-    assert(:mesh) {@parsed << "trimesh"}
-    assert(:lbrace) {@parsed << "{\n"}
-    # set material template
-    @parsed << "material = {\n"
-    @parsed << "diffuse = (0.8, 0.8, 0.8);\n"
-    @parsed << "}\n"
-    defines()
-    assert(:rbrace) {@parsed << "}\n"}
+    mesh = nil
+    assert(:mesh)
+    assert(:lbrace)
+    defines() do |d|
+      mesh = d
+    end
+    assert(:rbrace) {yield mesh}
   end
 
   def defines
+    mesh = MeshData.new
     while @token==:vertex || @token==:face || @token==:identifier
-      define()
+      define() do |t, d|
+        case t
+        when :vertex
+          mesh.vertexes = d
+        when :face
+          mesh.faces = d
+        end
+      end
     end
+    yield mesh
   end
 
   def define()
@@ -90,16 +190,16 @@ class Parser
       assert(:vertex)
       assert(:lbrace)
       assert(:int)
-      assert(:comma) {@parsed << "points = (\n"}
-      vertexes()
-      assert(:rbrace) {@parsed << ");\n"}
+      assert(:comma)
+      vertexes() {|d| yield :vertex, d}
+      assert(:rbrace)
     when :face
       assert(:face)
       assert(:lbrace)
       assert(:int)
-      assert(:comma) {@parsed << "faces = (\n"}
-      faces()
-      assert(:rbrace) {@parsed << ");\n"}
+      assert(:comma)
+      faces() {|d| yield :face, d}
+      assert(:rbrace)
     when :identifier
       # unsupported defines
       braces = []
@@ -119,42 +219,45 @@ class Parser
   end
 
   def vertexes()
-    vertex()
+    vertexes = []
+    vertex() {|vertex| vertexes.push(vertex)}
     while @token==:comma
-      assert(:comma) {@parsed << ",\n"}
-      vertex()
+      assert(:comma)
+      vertex() {|vertex| vertexes.push(vertex)}
     end
-    @parsed << "\n"
+    yield vertexes
   end
 
   def vertex()
-    vertex = [0,0,0]
+    vertex = Vector[0, 0, 0, 1]
     assert(:langle)
-    assert(:int, :real) {vertex[0] = @match.to_f}
+    assert(:int, :real) {vertex = Vector[@match.to_f, vertex[1], vertex[2], vertex[3]]}
     assert(:comma)
-    assert(:int, :real) {vertex[2] = -@match.to_f}
+    assert(:int, :real) {vertex = Vector[vertex[0], @match.to_f, vertex[2], vertex[3]]}
     assert(:comma)
-    assert(:int, :real) {vertex[1] = @match.to_f}
-    assert(:rangle) {@parsed << "(#{vertex.join(',')})"}
+    assert(:int, :real) {vertex = Vector[vertex[0], vertex[1], @match.to_f, vertex[3]]}
+    assert(:rangle) {yield vertex}
   end
 
   def faces()
-    face()
+    faces = []
+    face() {|face| faces.push(face)}
     while @token==:comma
-      assert(:comma) {@parsed << ",\n"}
-      face()
+      assert(:comma)
+      face() {|face| faces.push(face)}
     end
-    @parsed << "\n"
+    yield faces
   end
 
   def face()
-    assert(:langle) {@parsed << "("}
-    assert(:int) {@parsed << @match}
-    while @token==:comma
-      assert(:comma) {@parsed << ","}
-      assert(:int) {@parsed << @match}
-    end
-    assert(:rangle) {@parsed << ")"}
+    face = [0,0,0]
+    assert(:langle)
+    assert(:int) {face[0] = @match.to_i}
+    assert(:comma)
+    assert(:int) {face[1] = @match.to_i}
+    assert(:comma)
+    assert(:int) {face[2] = @match.to_i}
+    assert(:rangle) {yield face}
   end
 
   def camera()
@@ -184,7 +287,7 @@ class Parser
       [0, Math.sin(rot[0]), Math.cos(rot[0])]
     ] * Vector[0, 0, 1]
     @parsed << "viewdir = (#{viewdir_vector.to_a.join(',')});\n"
-    updir_vector = Vector[0, 1, 0]
+    updir_vector = Vector[0, 0, 1]
     @parsed << "updir = (#{updir_vector.to_a.join(',')});\n"
     @parsed << "aspectratio = #{@right / @up};\n"
   end
