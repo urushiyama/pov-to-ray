@@ -1,21 +1,18 @@
 require './lexer.rb'
 
-token = nil
-match = ""
+token = :other
 remain = STDIN.read
 
 lexer = Lexer.new(remain)
 
-lexer.lex do |t, m|
+lexer.lex do |t, m, r, l|
   token = t
-  match = m
-  puts "Token: #{token}, match: #{match}"
+  puts "Token: #{t}, match: #{m}, line: #{l}, remain: #{r}"
 end
 
 while token!=:EOD
-  lexer.lex do |t, m|
+  lexer.lex do |t, m, r, l|
     token = t
-    match = m
-    puts "Token: #{token}, match: #{match}"
+    puts "Token: #{t}, match: #{m}, line: #{l}, remain: #{r}"
   end
 end

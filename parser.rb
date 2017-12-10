@@ -32,13 +32,38 @@ class Parser
     while @token!=:EOD
       STDERR.print '.'
       case @token
-      when :mesh
-        mesh()
+      when :declare
+        declare()
+      # when :mesh
+      #   mesh()
       when :camera
         camera()
       else
         parse_next()
       end
+    end
+  end
+
+  def declare
+    assert(:declare)
+    assert(:identifier)
+    assert(:equal)
+    case @token
+    when :int
+      assert(:int)
+      assert(:semicolon)
+    when :real
+      assert(:real)
+      assert(:semicolon)
+    when :langle
+      vector()
+      assert(:semicolon)
+    when :mesh
+      mesh()
+    when :identifier
+      assert(:identifier)
+    else
+      assert(:int, :real, :mesh, :identifier)
     end
   end
 
@@ -54,7 +79,7 @@ class Parser
   end
 
   def defines
-    while @token==:vertex || @token==:face || @token==:other
+    while @token==:vertex || @token==:face || @token==:identifier
       define()
     end
   end
@@ -75,14 +100,19 @@ class Parser
       assert(:comma) {@parsed << "faces = (\n"}
       faces()
       assert(:rbrace) {@parsed << ");\n"}
-    when :other
+    when :identifier
       # unsupported defines
-      assert(:other)
-      assert(:lbrace)
-      while @token!=:rbrace
+      braces = []
+      assert(:identifier)
+      assert(:lbrace) {braces.push({match: @match, line: @line_number})}
+      until braces.empty?
+        if @token==:rbrace
+          braces.pop
+        elsif @token==:lbrace
+          braces.push({match: @match, line: @line_number})
+        end
         parse_next()
       end
-      assert(:rbrace)
     else
       assert(:vertex, :face)
     end
@@ -135,7 +165,7 @@ class Parser
   end
 
   def camera_params()
-    while @token==:location || @token==:right || @token==:up || @token==:angle || @token==:rotate || @token==:translate ||@token==:look_at || @token==:other
+    while @token==:location || @token==:right || @token==:up || @token==:angle || @token==:rotate || @token==:translate ||@token==:look_at || @token==:identifier
       camera_param()
     end
     @parsed << "position = (#{@pos[0]},#{@pos[1]},#{@pos[1]});\n"
@@ -219,9 +249,9 @@ class Parser
       assert(:comma)
       assert(:real, :int) {look_at[1] = @match.to_f} # Y look_at
       assert(:rangle) {@parsed << "look_at = (#{look_at.join(',')});\n"}
-    when :other
+    when :identifier
       # direction, sky, apertureなどのフォーカル・ブラーは未実装
-      assert(:other)
+      assert(:identifier)
       case @token
       when :langle
         vector()
@@ -233,7 +263,7 @@ class Parser
         assert(:langle, :real)
       end
     else
-      assert(:location, :right, :up, :angle, :rotate, :translate, :look_at, :other)
+      assert(:location, :right, :up, :angle, :rotate, :translate, :look_at, :identifier)
     end
   end
 
@@ -254,16 +284,19 @@ class Parser
     end
     .then { block.call unless block.nil? }
     .catch do
-      raise "Parse Error: unexpected #{@token}(#{@match}): #{tokens.join(' or ')} is expected"
+      massage = "#{@match + @remain}\n^"+"~"*(@match.length - 1)
+      massage << "Parse Error: unexpected #{@token}(#{@match}) in line #{@line_number}: #{tokens.join(' or ')} is expected"
+      raise massage
     end
     .finally { parse_next() }
     .execute
   end
 
   def parse_next
-    @lexer.lex do |token, match|
-      @token = token
-      @match = match
+    @lexer.lex do |t, m, r, l|
+      @token = t
+      @match = m
+      @line_number = l
     end
   end
 end
