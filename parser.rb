@@ -121,6 +121,7 @@ class Parser
             end
           else
             mesh = data[:data]
+            mesh.name = @match
           end
         end
       when :matrix
