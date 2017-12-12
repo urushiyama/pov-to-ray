@@ -43,10 +43,10 @@ class Parser
       case @token
       when :declare
         declare()
-      # when :mesh
-      #   mesh()
       when :camera
         camera()
+      when :light_source
+        light_source()
       when :object
         object()
       else
@@ -90,7 +90,6 @@ class Parser
         end
       end
     when :identifier
-      # assert(:identifier)
       define()
     else
       assert(:int, :real, :mesh, :identifier)
@@ -129,39 +128,43 @@ class Parser
           end
         end
       when :matrix
-        matrix = [[0,0,0,0], [0,0,0,0], [0,0,0,0]]
-        assert(:matrix)
-        assert(:langle)
-        assert(:int, :real) {matrix[0][0] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[1][0] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[2][0] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[0][1] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[1][1] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[2][1] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[0][2] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[1][2] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[2][2] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[0][3] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[1][3] = @match.to_f}
-        assert(:comma)
-        assert(:int, :real) {matrix[2][3] = @match.to_f}
-        assert(:rangle) {mesh_matrix = Matrix[*matrix]}
+        matrix() {|mat| mesh_matrix = Matrix[*mat]}
       else
         assert(:identifier, :matrix)
       end
     end
     mesh.matrix = mesh_matrix unless mesh.nil?
     yield mesh
+  end
+
+  def matrix(&block)
+    matrix = [[0,0,0,0], [0,0,0,0], [0,0,0,0]]
+    assert(:matrix)
+    assert(:langle)
+    assert(:int, :real) {matrix[0][0] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[1][0] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[2][0] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[0][1] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[1][1] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[2][1] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[0][2] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[1][2] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[2][2] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[0][3] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[1][3] = @match.to_f}
+    assert(:comma)
+    assert(:int, :real) {matrix[2][3] = @match.to_f}
+    assert(:rangle) {block.call(matrix) unless block.nil?}
   end
 
   def mesh
@@ -207,29 +210,12 @@ class Parser
       assert(:rbrace)
     when :identifier
       # unsupported defines
-      braces = []
       assert(:identifier)
       case @token
       when :lbrace
-        # group { ... }
-        assert(:lbrace) {braces.push({match: @match, line: @line_number})}
-        until braces.empty?
-          if @token==:rbrace
-            braces.pop
-          elsif @token==:lbrace
-            braces.push({match: @match, line: @line_number})
-          end
-          parse_next()
-        end
+        group()
       when :lparen
-        # func ( [:int || :real || :vector || :identifier] (, ...)* )
-        assert(:lparen)
         func_params()
-        while @token==:comma
-          assert(:comma)
-          func_params()
-        end
-        assert(:rparen)
       else
         assert(:lbrace, :lparen)
       end
@@ -241,6 +227,17 @@ class Parser
   end
 
   def func_params()
+    # func ( [:int || :real || :vector || :identifier] (, ...)* )
+    assert(:lparen)
+    func_param()
+    while @token==:comma
+      assert(:comma)
+      func_param()
+    end
+    assert(:rparen)
+  end
+
+  def func_param()
     case @token
     when :int
       assert(:int)
@@ -305,6 +302,20 @@ class Parser
     assert(:comma)
     assert(:int) {face[2] = @match.to_i}
     assert(:rangle) {yield face}
+  end
+
+  def group()
+    # group { ... }
+    braces = []
+    assert(:lbrace) {braces.push({match: @match, line: @line_number})}
+    until braces.empty?
+      if @token==:rbrace
+        braces.pop
+      elsif @token==:lbrace
+        braces.push({match: @match, line: @line_number})
+      end
+      parse_next()
+    end
   end
 
   def camera()
@@ -411,7 +422,7 @@ class Parser
       assert(:real, :int) {@look_at[1] = @match.to_f} # Y look_at
       assert(:comma)
       assert(:real, :int) {@look_at[2] = @match.to_f} # Z look_at
-      assert(:rangle) # {@parsed << "look_at = (#{look_at.join(',')});\n"}
+      assert(:rangle)
     when :identifier
       # direction, sky, apertureなどのフォーカル・ブラーは未実装
       assert(:identifier)
@@ -423,11 +434,305 @@ class Parser
       when :int
         assert(:int)
       else
-        assert(:langle, :real)
+        assert(:langle, :real, :int)
       end
     else
       assert(:location, :right, :up, :angle, :rotate, :translate, :look_at, :identifier)
     end
+  end
+
+  def light_source()
+    assert(:light_source)
+    assert(:lbrace)
+    light_definitions()
+    assert(:rbrace)
+  end
+
+  def light_definitions()
+    accepts = [
+      :langle, :color,
+      :spotlight, :cylinder, :parallel, :area_light,
+      :shadowless, :fade_distance, :fade_power,
+      :media_attenuation, :media_interaction, :matrix, :identifier
+    ]
+    while accepts.include?(@token)
+      case @token
+      when :langle
+        # light location before applying matrix
+        assert(:langle)
+        assert(:int, :real)
+        assert(:comma)
+        assert(:int, :real)
+        assert(:comma)
+        assert(:int, :real)
+        assert(:rangle)
+      when :color
+        assert(:color)
+        color_statements()
+      when :spotlight
+        assert(:spotlight)
+        spotlight_definitions()
+      when :cylinder
+        assert(:cylinder)
+        cylinder_light_definitions()
+      when :parallel
+        assert(:parallel)
+        parallel_light_definitions()
+      when :area_light
+        assert(:area_light)
+        area_light_definitions()
+      when :shadowless
+        assert(:shadowless) # still make shadow
+      when :fade_distance
+        assert(:fade_distance)
+        assert(:int, :real)
+      when :fade_power
+        assert(:fade_power)
+        assert(:int, :real) # cast to 0, 1 or 2
+      when :media_attenuation
+        assert(:media_attenuation)
+        assert(:on, :off)
+      when :media_interaction
+        assert(:media_interaction)
+        assert(:on, :off)
+      when :matrix
+        matrix()
+      when :identifier
+        # looks_like, project_through, light_groupは未実装
+        assert(:identifier)
+        group()
+      else
+        assert(*accepts)
+      end
+    end
+  end
+
+  def spotlight_definitions()
+    while @token==:point_at || @token==:identifier
+      case @token
+      when :point_at
+        assert(:point_at)
+        assert(:langle)
+        assert(:int, :real)
+        assert(:comma)
+        assert(:int, :real)
+        assert(:comma)
+        assert(:int, :real)
+        assert(:rangle)
+      when :identifier
+        # radius, falloff, tightness (, looks_like, project_through, light_group)
+        assert(:identifier)
+        case @token
+        when :int
+          assert(:int)
+        when :real
+          assert(:real)
+        when :lbrace
+          group()
+        else
+          assert(:int, :real, :lbrace)
+        end
+      end
+    end
+  end
+
+  def cylinder_light_definitions()
+    while @token==:point_at || @token==:identifier
+      case @token
+      when :point_at
+        assert(:point_at)
+        assert(:langle)
+        assert(:int, :real)
+        assert(:comma)
+        assert(:int, :real)
+        assert(:comma)
+        assert(:int, :real)
+        assert(:rangle)
+      when :identifier
+        # radius, falloff, tightness (, looks_like, project_through, light_group)
+        assert(:identifier)
+        case @token
+        when :int
+          assert(:int)
+        when :real
+          assert(:real)
+        when :lbrace
+          group()
+        else
+          assert(:int, :real, :lbrace)
+        end
+      end
+    end
+  end
+
+  def parallel_light_definitions()
+    assert(:point_at)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def area_light_definitions()
+    vector() # <AXIS 1>
+    assert(:comma)
+    vector() # <AXIS 2>
+    assert(:comma)
+    assert(:int, :real) # SIZE 1
+    assert(:comma)
+    assert(:int, :real) # SIZE 2
+    accepts = [:adaptive, :jitter, :circular, :orient, :spotlight, :cylinder]
+    while accepts.include?(@token)
+      case @token
+      when :adaptive
+        assert(:adaptive)
+        assert(:int)
+      when :jitter
+        assert(:jitter)
+      when :circular
+        assert(:circular)
+      when :orient
+        assert(:orient)
+      when :spotlight
+        assert(:spotlight)
+        spotlight_definitions()
+      when :cylinder
+        assert(:cylinder)
+        cylinder_light_definitions()
+      else
+        assert(*accepts)
+      end
+    end
+  end
+
+  def color_statements()
+    case @token
+    when :rgb
+      rgb()
+    when :rgbf
+      rgbf()
+    when :rgbt
+      rgbt()
+    when :rgbft
+      rgbft()
+    when :srgb
+      srgb()
+    when :srgbf
+      srgbf()
+    when :srgbt
+      srgbt()
+    when :srgbft
+      srgbft()
+    else
+      assert(:rgb, :rgbf, :rgbt, :rgbft, :srgb, :srgbf, :srgbt, :srgbft)
+    end
+  end
+
+  def rgb()
+    assert(:rgb)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def rgbf()
+    assert(:rgbf)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def rgbt()
+    assert(:rgbt)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def rgbft()
+    assert(:rgbft)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def srgb()
+    assert(:srgb)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def srgbf()
+    assert(:srgbf)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def srgbt()
+    assert(:srgbt)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
+  end
+
+  def srgbft()
+    assert(:srgbft)
+    assert(:langle)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:comma)
+    assert(:int, :real)
+    assert(:rangle)
   end
 
   def vector()
