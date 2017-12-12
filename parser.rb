@@ -89,7 +89,8 @@ class Parser
         end
       end
     when :identifier
-      assert(:identifier)
+      # assert(:identifier)
+      define()
     else
       assert(:int, :real, :mesh, :identifier)
     end
@@ -174,7 +175,7 @@ class Parser
 
   def defines
     mesh = MeshData.new
-    while @token==:vertex || @token==:face || @token==:identifier
+    while @token==:vertex || @token==:face || @token==:declare || @token==:identifier
       define() do |t, d|
         case t
         when :vertex
@@ -207,17 +208,49 @@ class Parser
       # unsupported defines
       braces = []
       assert(:identifier)
-      assert(:lbrace) {braces.push({match: @match, line: @line_number})}
-      until braces.empty?
-        if @token==:rbrace
-          braces.pop
-        elsif @token==:lbrace
-          braces.push({match: @match, line: @line_number})
+      case @token
+      when :lbrace
+        # group { ... }
+        assert(:lbrace) {braces.push({match: @match, line: @line_number})}
+        until braces.empty?
+          if @token==:rbrace
+            braces.pop
+          elsif @token==:lbrace
+            braces.push({match: @match, line: @line_number})
+          end
+          parse_next()
         end
-        parse_next()
+      when :lparen
+        # func ( [:int || :real || :vector || :identifier] (, ...)* )
+        assert(:lparen)
+        func_params()
+        while @token==:comma
+          assert(:comma)
+          func_params()
+        end
+        assert(:rparen)
+      else
+        assert(:lbrace, :lparen)
       end
+    when :declare
+      declare()
     else
       assert(:vertex, :face)
+    end
+  end
+
+  def func_params()
+    case @token
+    when :int
+      assert(:int)
+    when :real
+      assert(:real)
+    when :langle
+      vector()
+    when :identifier
+      assert(:identifier)
+    else
+      assert(:int, :real, :langle, :identifier)
     end
   end
 
@@ -247,6 +280,16 @@ class Parser
     face() {|face| faces.push(face)}
     while @token==:comma
       assert(:comma)
+      if @token==:int
+        # texture-mapped faces
+        assert(:int)
+        assert(:comma)
+        assert(:int)
+        assert(:comma)
+        assert(:int)
+        break if @token!=:comma
+        assert(:comma)
+      end
       face() {|face| faces.push(face)}
     end
     yield faces
