@@ -403,8 +403,8 @@ class Parser
     end
     .then { block.call unless block.nil? }
     .catch do
-      massage = "#{@match + @remain}\n^"+"~"*(@match.length - 1)
-      massage << "Parse Error: unexpected #{@token}(#{@match}) in line #{@line_number}: #{tokens.join(' or ')} is expected"
+      massage = "\n#{@line_number}: #{@match + @remain.chomp}\n"+ " " * (@line_number.to_s.length) +"  ^"+"~"*(@match.length - 1)
+      massage << "\nParse Error: unexpected #{@token} in line #{@line_number}: #{tokens.join(' or ')} is expected"
       raise massage
     end
     .finally { parse_next() }
@@ -415,6 +415,7 @@ class Parser
     @lexer.lex do |t, m, r, l|
       @token = t
       @match = m
+      @remain = r
       @line_number = l
     end
   end
