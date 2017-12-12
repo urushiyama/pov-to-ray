@@ -120,6 +120,74 @@ class Lexer
         @remain = $'
         yield @token, @match, @remain, @line_number
         break
+      # Not implemented yet...
+      when /^media_attenuation/
+        @token = :media_attenuation
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^media_interaction/
+        @token = :media_interaction
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^on/
+        @token = :on
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^off/
+        @token = :off
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^spotlight/
+        @token = :spotlight
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^cylinder/
+        @token = :cylinder
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^area_light/
+        @token = :area_light
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^adaptive/
+        @token = :adaptive
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^jitter/
+        @token = :jitter
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^circular/
+        @token = :circular
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^orient/
+        @token = :orient
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when
       # --- Camera settings ---
       when /^camera/
         @token = :camera
