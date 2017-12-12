@@ -1,6 +1,9 @@
 class Lexer
+  attr_reader :line_count
+
   def initialize(text)
     @lines = text.lines
+    @line_count = @lines.length
     @remain = @lines.shift
     @line_number = 1
     @match = ""

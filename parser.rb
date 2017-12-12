@@ -28,6 +28,7 @@ class Parser
   end
 
   def start
+    STDERR.print "["
     @parsed << "SBT-raytracer 1.0\n"
     # set directional light template
     @parsed << "directional_light {\n"
@@ -39,7 +40,6 @@ class Parser
     @parsed << "color=( 1,1,1 );\n"
     @parsed << "}\n"
     while @token!=:EOD
-      STDERR.print '.'
       case @token
       when :declare
         declare()
@@ -53,6 +53,7 @@ class Parser
         parse_next()
       end
     end
+    STDERR.print "]\n"
   end
 
   def declare
@@ -460,6 +461,12 @@ class Parser
       @match = m
       @remain = r
       @line_number = l
+    end
+    @parse_ratio ||= 0
+    new_parse_ratio = @line_number.to_f / @lexer.line_count
+    if (new_parse_ratio * 10).to_i > (@parse_ratio * 10).to_i
+      STDERR.print '#'
+      @parse_ratio = new_parse_ratio
     end
   end
 end
