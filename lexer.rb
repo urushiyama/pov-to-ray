@@ -90,6 +90,48 @@ class Lexer
         @remain = $'
         yield @token, @match, @remain, @line_number
         break
+      when /^srgbf/
+        @token = :srgbf
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^srgbt/
+        @token = :srgbt
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^srgbft/
+        @token = :srgbft
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^rgb/
+        @token = :rgb
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^rgbf/
+        @token = :rgbf
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^rgbt/
+        @token = :rgbt
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^rgbft/
+        @token = :rgbft
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
       when /^fade_distance/
         @token = :fade_distance
         @match = $&
@@ -187,7 +229,6 @@ class Lexer
         @remain = $'
         yield @token, @match, @remain, @line_number
         break
-      when
       # --- Camera settings ---
       when /^camera/
         @token = :camera
