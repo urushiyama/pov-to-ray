@@ -74,6 +74,67 @@ class Lexer
         @remain = $'
         yield @token, @match, @remain, @line_number
         break
+      when /^normal_vectors/
+        @token = :identifier
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^normal_indices/
+        @token = :identifier
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      # --- Global settings ---
+      when /^global_settings/
+        @token = :global_settings
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^assumed_gamma/
+        @token = :assumed_gamma
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^ambient_light/
+        @token = :ambient_light
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^charset/
+        @token = :charset
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^ascii/
+        @token = :ascii
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^utf8/
+        @token = :utf8
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^sys/
+        @token = :sys
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^hf_gray_16/
+        @token = :hf_gray_16
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
       # --- Light settings ---
       when /^light_source/
         @token = :light_source
@@ -174,18 +235,6 @@ class Lexer
         break
       when /^media_interaction/
         @token = :media_interaction
-        @match = $&
-        @remain = $'
-        yield @token, @match, @remain, @line_number
-        break
-      when /^on/
-        @token = :on
-        @match = $&
-        @remain = $'
-        yield @token, @match, @remain, @line_number
-        break
-      when /^off/
-        @token = :off
         @match = $&
         @remain = $'
         yield @token, @match, @remain, @line_number
@@ -325,6 +374,21 @@ class Lexer
         @remain = $'
         yield @token, @match, @remain, @line_number
         break
+      # --- Booleans ---
+      when /^(on|yes|true)/
+        @token = :true
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^(off|no|false)/
+        @token = :false
+        @match = $&
+        @remain = $'
+        yield @token, @match, @remain, @line_number
+        break
+      when /^yes/
+        @token = :true
       # --- Numbers ---
       when /^-?[0-9]+\.[0-9]+/
         @token = :real

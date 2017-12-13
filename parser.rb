@@ -2,6 +2,7 @@ require 'matrix'
 require './assert_helper.rb'
 require './dictionary.rb'
 require './mesh_data.rb'
+require './light_data.rb'
 
 class Parser
   def initialize(lexer)
@@ -13,6 +14,7 @@ class Parser
     @right = 1
     @look_at = [0,0,-1]
     @fov = 50
+    @assumed_gamma = 1.0
     @dict = Dictionary.new
   end
 
@@ -31,16 +33,18 @@ class Parser
     STDERR.print "["
     @parsed << "SBT-raytracer 1.0\n"
     # set directional light template
-    @parsed << "directional_light {\n"
-    @parsed << "direction=( -0.764302,-0.392387,-0.511737 );\n"
-    @parsed << "color=( 1,1,1 );\n"
-    @parsed << "}\n"
-    @parsed << "directional_light {\n"
-    @parsed << "direction=( 0.392387,0.764302,-0.511737 );\n"
-    @parsed << "color=( 1,1,1 );\n"
-    @parsed << "}\n"
+    # @parsed << "directional_light {\n"
+    # @parsed << "direction=( -0.764302,-0.392387,-0.511737 );\n"
+    # @parsed << "color=( 1,1,1 );\n"
+    # @parsed << "}\n"
+    # @parsed << "directional_light {\n"
+    # @parsed << "direction=( 0.392387,0.764302,-0.511737 );\n"
+    # @parsed << "color=( 1,1,1 );\n"
+    # @parsed << "}\n"
     while @token!=:EOD
       case @token
+      when :global_settings
+        global_settings()
       when :declare
         declare()
       when :camera
@@ -54,6 +58,47 @@ class Parser
       end
     end
     STDERR.print "]\n"
+  end
+
+  def global_settings()
+    assert(:global_settings)
+    accepts = [:assumed_gamma, :ambient_light, :hf_gray_16, :charset, :identifier]
+    while accepts.include?(@token)
+      case @token
+      when :assumed_gamma
+        assert(:assumed_gamma)
+        assert(:int, :real) {@assumed_gamma = @match.to_f}
+      when :ambient_light
+        assert(:ambient_light)
+        color_statements() do |r,g,b|
+          @parsed << "ambient_light {\n"
+          @parsed << "color = (#{r},#{g},#{b});\n"
+          @parsed << "}\n"
+        end
+      when :charset
+        assert(:charset)
+        assert(:ascii, :utf8, :sys) do
+          STDERR.puts "Parse Warning: declared charset isn't UTF-8\n" if @token!=:utf8
+        end
+      when :hf_gray_16
+        assert(:hf_gray_16)
+        assert(:true, :false) if @token==:true || @token==:false
+      when :identifier
+        assert(:identifier)
+        case @token
+        when :int
+          assert(:int)
+        when :real
+          assert(:real)
+        when :langle
+          vector()
+        when :lbrace
+          group()
+        else
+          assert(:int, :real, :langle, :lbrace)
+        end
+      end
+    end
   end
 
   def declare
@@ -449,6 +494,14 @@ class Parser
   end
 
   def light_definitions()
+    light = nil
+    type = :point_light
+    position = [0,0,0,1]
+    point_at = [0,0,0,1]
+    color = [0,0,0]
+    fade_distance = 3
+    fade_power = 2
+    matrix = []
     accepts = [
       :langle, :color,
       :spotlight, :cylinder, :parallel, :area_light,
@@ -460,15 +513,19 @@ class Parser
       when :langle
         # light location before applying matrix
         assert(:langle)
-        assert(:int, :real)
+        assert(:int, :real) {position[0] = @match.to_f}
         assert(:comma)
-        assert(:int, :real)
+        assert(:int, :real) {position[1] = @match.to_f}
         assert(:comma)
-        assert(:int, :real)
+        assert(:int, :real) {position[2] = @match.to_f}
         assert(:rangle)
       when :color
         assert(:color)
-        color_statements()
+        color_statements() do |r,g,b|
+          color[0] = r
+          color[1] = g
+          color[2] = b
+        end
       when :spotlight
         assert(:spotlight)
         spotlight_definitions()
@@ -477,7 +534,12 @@ class Parser
         cylinder_light_definitions()
       when :parallel
         assert(:parallel)
-        parallel_light_definitions()
+        parallel_light_definitions() do |t, p_at|
+          type = t
+          point_at[0] = p_at[0]
+          point_at[1] = p_at[1]
+          point_at[2] = p_at[2]
+        end
       when :area_light
         assert(:area_light)
         area_light_definitions()
@@ -485,18 +547,22 @@ class Parser
         assert(:shadowless) # still make shadow
       when :fade_distance
         assert(:fade_distance)
-        assert(:int, :real)
+        assert(:int, :real) {fade_distance = @match.to_f}
       when :fade_power
         assert(:fade_power)
-        assert(:int, :real) # cast to 0, 1 or 2
+        assert(:int, :real) do # cast to 0, 1 or 2
+          fade_power = @match.to_i
+          fade_power = 0 if fade_power < 0
+          fade_power = 2 if fade_power > 2
+        end
       when :media_attenuation
         assert(:media_attenuation)
-        assert(:on, :off)
+        assert(:true, :false)
       when :media_interaction
         assert(:media_interaction)
-        assert(:on, :off)
+        assert(:true, :false)
       when :matrix
-        matrix()
+        matrix() {|mat| matrix = mat}
       when :identifier
         # looks_like, project_through, light_groupは未実装
         assert(:identifier)
@@ -504,6 +570,34 @@ class Parser
       else
         assert(*accepts)
       end
+    end
+    case type
+    when :point_light
+      light = PointLightData.new(color, Matrix[*matrix])
+      light.position = Vector[*position]
+      # POV-RayよりもRayTracerは暗いので、算出される各係数を1/2にしている。
+      case fade_power
+      when 0
+        light.constant_atten = 0.25 + 0.25 / fade_distance
+        light.linear_atten = 0.0
+        light.quadratic_atten = 0.0
+      when 1
+        light.constant_atten = 0.25
+        light.linear_atten = 0.25 / fade_distance
+        light.quadratic_atten = 0.0
+      when 2
+        light.constant_atten = 0.25
+        light.linear_atten = 0.0
+        light.quadratic_atten = 0.25 / fade_distance
+      end
+      @parsed << light.apply_matrix.parse
+    when :parallel
+      light = DirectionalLightData.new(color, Matrix[*matrix])
+      light.direction = Vector[*point_at]
+      @parsed << light.apply_matrix.parse
+    else
+      # unsupported light type
+      STDERR.puts "Parse Warning: Unsupported light type #{type} detected"
     end
   end
 
@@ -565,15 +659,17 @@ class Parser
     end
   end
 
-  def parallel_light_definitions()
+  def parallel_light_definitions(&block)
+    type = :parallel
+    point_at = [0,0,0]
     assert(:point_at)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {point_at[0] = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {point_at[1] = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {point_at[2] = -@match.to_f}
+    assert(:rangle) {block.call(type, point_at) unless block.nil?}
   end
 
   def area_light_definitions()
@@ -608,131 +704,163 @@ class Parser
     end
   end
 
-  def color_statements()
+  def color_statements(&block)
     case @token
     when :rgb
-      rgb()
+      rgb() {|r,g,b| block.call(r,g,b) unless block.nil?}
     when :rgbf
-      rgbf()
+      rgbf() {|r,g,b,f| block.call(r,g,b,f) unless block.nil?}
     when :rgbt
-      rgbt()
+      rgbt() {|r,g,b,t| block.call(r,g,b,t) unless block.nil?}
     when :rgbft
-      rgbft()
+      rgbft() {|r,g,b,f,t| block.call(r,g,b,f,t) unless block.nil?}
     when :srgb
-      srgb()
+      srgb() {|r,g,b| block.call(r,g,b) unless block.nil?}
     when :srgbf
-      srgbf()
+      srgbf() {|r,g,b,f| block.call(r,g,b,f) unless block.nil?}
     when :srgbt
-      srgbt()
+      srgbt() {|r,g,b,t| block.call(r,g,b,t) unless block.nil?}
     when :srgbft
-      srgbft()
+      srgbft() {|r,g,b,f,t| block.call(r,g,b,f,t) unless block.nil?}
     else
       assert(:rgb, :rgbf, :rgbt, :rgbft, :srgb, :srgbf, :srgbt, :srgbft)
     end
   end
 
-  def rgb()
+  def rgb(&block)
+    r = 0
+    g = 0
+    b = 0
     assert(:rgb)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {b = @match.to_f}
+    assert(:rangle) {block.call(r,g,b) unless block.nil?}
   end
 
-  def rgbf()
+  def rgbf(&block)
+    r = 0
+    g = 0
+    b = 0
+    f = 0
     assert(:rgbf)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {b = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {f = @match.to_f}
+    assert(:rangle) {block.call(r,g,b,f) unless block.nil?}
   end
 
-  def rgbt()
+  def rgbt(&block)
+    r = 0
+    g = 0
+    b = 0
+    t = 0
     assert(:rgbt)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {b = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {t = @match.to_f}
+    assert(:rangle) {block.call(r,g,b,t) unless block.nil?}
   end
 
-  def rgbft()
+  def rgbft(&block)
+    r = 0
+    g = 0
+    b = 0
+    f = 0
+    t = 0
     assert(:rgbft)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {b = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {f = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {t = @match.to_f}
+    assert(:rangle) {block.call(r,g,b,f,t) unless block.nil?}
   end
 
-  def srgb()
+  def srgb(&block)
+    r = 0
+    g = 0
+    b = 0
     assert(:srgb)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {b = @match.to_f}
+    assert(:rangle) {block.call(r,g,b) unless block.nil?}
   end
 
-  def srgbf()
+  def srgbf(&block)
+    r = 0
+    g = 0
+    b = 0
+    f = 0
     assert(:srgbf)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {b = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {f = @match.to_f}
+    assert(:rangle) {block.call(r,g,b,f) unless block.nil?}
   end
 
-  def srgbt()
+  def srgbt(&block)
+    r = 0
+    g = 0
+    b = 0
+    t = 0
     assert(:srgbt)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {b = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {t = @match.to_f}
+    assert(:rangle) {block.call(r,g,b,t) unless block.nil?}
   end
 
   def srgbft()
+    r = 0
+    g = 0
+    b = 0
+    f = 0
+    t = 0
     assert(:srgbft)
     assert(:langle)
-    assert(:int, :real)
+    assert(:int, :real) {r = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {g = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {b = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
+    assert(:int, :real) {f = @match.to_f}
     assert(:comma)
-    assert(:int, :real)
-    assert(:rangle)
+    assert(:int, :real) {t = @match.to_f}
+    assert(:rangle) {block.call(r,g,b,f,t) unless block.nil?}
   end
 
   def vector()

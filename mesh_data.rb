@@ -3,7 +3,7 @@ require 'matrix'
 class MeshData
   attr_accessor :vertexes, :faces, :matrix, :name
 
-  @@DEFAULT_MATRIX = Matrix[[]]
+  @@DEFAULT_MATRIX = Matrix[[1,0,0,0],[0,0,1,0],[0,-1,0,0]]
 
   def initialize(v = [], f = [], m = @@DEFAULT_MATRIX, n = nil)
     @vertexes = v
