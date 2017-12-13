@@ -801,11 +801,17 @@ class Parser
     b = 0
     assert(:srgb)
     assert(:langle)
-    assert(:int, :real) {r = @match.to_f}
+    assert(:int, :real) {r = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {g = @match.to_f}
+    assert(:int, :real) {g = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {b = @match.to_f}
+    assert(:int, :real) {b = @match.to_f ** (@assumed_gamma / 2.2)}
+    r = 0.0 if r < 0.0
+    r = 1.0 if r > 1.0
+    g = 0.0 if g < 0.0
+    g = 1.0 if g > 1.0
+    b = 0.0 if b < 0.0
+    b = 1.0 if b > 1.0
     assert(:rangle) {block.call(r,g,b) unless block.nil?}
   end
 
@@ -816,13 +822,19 @@ class Parser
     f = 0
     assert(:srgbf)
     assert(:langle)
-    assert(:int, :real) {r = @match.to_f}
+    assert(:int, :real) {r = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {g = @match.to_f}
+    assert(:int, :real) {g = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {b = @match.to_f}
+    assert(:int, :real) {b = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
     assert(:int, :real) {f = @match.to_f}
+    r = 0.0 if r < 0.0
+    r = 1.0 if r > 1.0
+    g = 0.0 if g < 0.0
+    g = 1.0 if g > 1.0
+    b = 0.0 if b < 0.0
+    b = 1.0 if b > 1.0
     assert(:rangle) {block.call(r,g,b,f) unless block.nil?}
   end
 
@@ -833,13 +845,19 @@ class Parser
     t = 0
     assert(:srgbt)
     assert(:langle)
-    assert(:int, :real) {r = @match.to_f}
+    assert(:int, :real) {r = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {g = @match.to_f}
+    assert(:int, :real) {g = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {b = @match.to_f}
+    assert(:int, :real) {b = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
     assert(:int, :real) {t = @match.to_f}
+    r = 0.0 if r < 0.0
+    r = 1.0 if r > 1.0
+    g = 0.0 if g < 0.0
+    g = 1.0 if g > 1.0
+    b = 0.0 if b < 0.0
+    b = 1.0 if b > 1.0
     assert(:rangle) {block.call(r,g,b,t) unless block.nil?}
   end
 
@@ -851,15 +869,21 @@ class Parser
     t = 0
     assert(:srgbft)
     assert(:langle)
-    assert(:int, :real) {r = @match.to_f}
+    assert(:int, :real) {r = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {g = @match.to_f}
+    assert(:int, :real) {g = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
-    assert(:int, :real) {b = @match.to_f}
+    assert(:int, :real) {b = @match.to_f ** (@assumed_gamma / 2.2)}
     assert(:comma)
     assert(:int, :real) {f = @match.to_f}
     assert(:comma)
     assert(:int, :real) {t = @match.to_f}
+    r = 0.0 if r < 0.0
+    r = 1.0 if r > 1.0
+    g = 0.0 if g < 0.0
+    g = 1.0 if g > 1.0
+    b = 0.0 if b < 0.0
+    b = 1.0 if b > 1.0
     assert(:rangle) {block.call(r,g,b,f,t) unless block.nil?}
   end
 
