@@ -376,21 +376,6 @@ class Parser
     end
     @parsed << "position = (#{@pos[0]},#{@pos[1]},#{@pos[2]});\n"
     rot = @rotate.map{|v| v * Math::PI / 180} # degree to radian
-    viewdir_vector = Matrix[
-      [Math.cos(rot[2]), -Math.sin(rot[2]), 0],
-      [Math.sin(rot[2]), Math.cos(rot[2]), 0],
-      [0, 0, 1]
-    ] * Matrix[
-      [Math.cos(rot[1]), 0, Math.sin(rot[1])],
-      [0, 1, 0],
-      [-Math.sin(rot[1]), 0, Math.cos(rot[1])]
-    ] * Matrix[
-      [1, 0, 0],
-      [0, Math.cos(rot[0]), -Math.sin(rot[0])],
-      [0, Math.sin(rot[0]), Math.cos(rot[0])]
-    ] * Vector[*@look_at]
-    @parsed << "viewdir = (#{viewdir_vector.to_a.join(',')});\n"
-    # updir_vector = Vector[0, 0, 1]
     updir_vector = Matrix[
       [Math.cos(rot[2]), -Math.sin(rot[2]), 0],
       [Math.sin(rot[2]), Math.cos(rot[2]), 0],
@@ -403,8 +388,22 @@ class Parser
       [1, 0, 0],
       [0, Math.cos(rot[0]), -Math.sin(rot[0])],
       [0, Math.sin(rot[0]), Math.cos(rot[0])]
+    ] * Vector[*@look_at]
+    viewdir_vector = Matrix[
+      [Math.cos(rot[2]), -Math.sin(rot[2]), 0],
+      [Math.sin(rot[2]), Math.cos(rot[2]), 0],
+      [0, 0, 1]
+    ] * Matrix[
+      [Math.cos(rot[1]), 0, Math.sin(rot[1])],
+      [0, 1, 0],
+      [-Math.sin(rot[1]), 0, Math.cos(rot[1])]
+    ] * Matrix[
+      [1, 0, 0],
+      [0, Math.cos(rot[0]), -Math.sin(rot[0])],
+      [0, Math.sin(rot[0]), Math.cos(rot[0])]
     ] * Vector[0, 1, 0]
-    @parsed << "updir = (#{updir_vector.to_a.join(',')});\n"
+    @parsed << "viewdir = (#{viewdir_vector[0]},#{viewdir_vector[1]},#{-viewdir_vector[2]});\n"
+    @parsed << "updir = (#{updir_vector[0]},#{updir_vector[1]},#{-updir_vector[2]});\n"
     @parsed << "aspectratio = #{@right / @up};\n"
     @parsed << "fov = #{@fov / @right * @up};\n"
   end
