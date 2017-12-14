@@ -16,6 +16,7 @@ class Parser
     @fov = 50
     @assumed_gamma = 1.0
     @dict = Dictionary.new
+    @parse_ratio = nil
   end
 
   def parse
@@ -30,7 +31,6 @@ class Parser
   end
 
   def start
-    STDERR.print "["
     @parsed << "SBT-raytracer 1.0\n"
     # set directional light template
     # @parsed << "directional_light {\n"
@@ -57,7 +57,7 @@ class Parser
         parse_next()
       end
     end
-    STDERR.print "]\n"
+    STDERR.print "\n"
   end
 
   def global_settings()
@@ -918,11 +918,21 @@ class Parser
       @remain = r
       @line_number = l
     end
-    @parse_ratio ||= 0
-    new_parse_ratio = @line_number.to_f / @lexer.line_count
-    if (new_parse_ratio * 10).to_i > (@parse_ratio * 10).to_i
-      STDERR.print '#'
+    if @parse_ratio.nil?
+      @parse_ratio = 0
+      new_parse_ratio = @line_number.to_f / @lexer.line_count
+      ps = (new_parse_ratio * 100).to_i.to_s
+      ps = " " * (3-ps.length) + ps if ps.length < 3
+      STDERR.print "#{ps}%"
       @parse_ratio = new_parse_ratio
+    else
+      new_parse_ratio = @line_number.to_f / @lexer.line_count
+      if (new_parse_ratio * 100).to_i > (@parse_ratio * 100).to_i
+        ps = (new_parse_ratio * 100).to_i.to_s
+        ps = " " * (3-ps.length) + ps if ps.length < 3
+        STDERR.print "\b\b\b\b" + "#{ps}%"
+        @parse_ratio = new_parse_ratio
+      end
     end
   end
 end
