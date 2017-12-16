@@ -5,7 +5,7 @@ require './mesh_data.rb'
 require './light_data.rb'
 
 class Parser
-  def initialize(lexer)
+  def initialize(lexer, options)
     @lexer = lexer
     @parsed = "// Parsed by povtoray (created by @urushiyama)\n"
     @pos = [0.0, 0.0, 0.0]
@@ -17,6 +17,7 @@ class Parser
     @assumed_gamma = 1.0
     @dict = Dictionary.new
     @parse_ratio = nil
+    @options = options
   end
 
   def parse
@@ -53,6 +54,15 @@ class Parser
         light_source()
       when :object
         object()
+      when :comment
+        if @options[:include_comments]
+          assert(:comment) do
+            @parsed << @match
+            @parsed << "\n"
+          end
+        else
+          parse_next()
+        end
       else
         parse_next()
       end

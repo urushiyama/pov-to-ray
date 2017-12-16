@@ -403,7 +403,7 @@ class Lexer
         yield @token, @match, @remain, @line_number
         break
       # --- Comments ---
-      when /^\/\/[^\n]*/
+      when /^\/\/.*$/
         @token = :comment
         @match = $&
         @remain = $'
